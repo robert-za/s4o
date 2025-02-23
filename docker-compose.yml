@@ -1,0 +1,51 @@
+services:
+  db:
+    image: postgres:latest
+    restart: always
+    ports:
+      - "5432:5432"
+    expose:
+      - "5432"
+    environment:
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=postgres
+    volumes:
+      - postgres_data:/var/lib/postgres/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d postgres"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: bash -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+    volumes:
+      - ./app:/s4o/app
+      - ./tests:/s4o/tests
+      - .env:/.env
+    restart: no
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+    name: postgres_data
+
+networks:
+  app-network:
+    driver: bridge
